@@ -291,9 +291,23 @@
         <a href="devoirs.html" class="content-button">Devoirs</a>
     </div>
 
+    <div class="file-upload">
+        <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.tex">
+        <button onclick="handleFileUpload()">Ajouter le fichier</button>
+    </div>
+
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Rechercher un fichier..." onkeyup="searchFiles()">
+    </div>
+
+    <div id="dynamicButtons" class="content-buttons">
+        <!-- Les boutons dynamiques seront ajoutés ici -->
+    </div>
+
     <footer>
         <p>&copy; 2024 Fabdelkarim - Tous droits réservés</p>
     </footer>
+
     <script>
         // Utilisation d'IndexedDB pour le stockage illimité
         let db;
