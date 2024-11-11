@@ -372,14 +372,13 @@
         <h1>Seconde - Travaux Dirigés</h1>
     </div>
 
-    <div class="content-buttons">
-        <a href="cours.html" class="content-button">Cours</a>
-        <a href="td.html" class="content-button">Travaux Dirigés</a>
-        <a href="devoirs.html" class="content-button">Devoirs</a>
-        <a href="snt.html" class="content-button">SNT</a>
-    </div>
-
     <div class="file-upload">
+        <select id="fileSection">
+            <option value="cours">Cours</option>
+            <option value="td">Travaux Dirigés</option>
+            <option value="devoirs">Devoirs</option>
+            <option value="snt">SNT</option>
+        </select>
         <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.tex">
         <button onclick="handleFileUpload()">Ajouter le fichier</button>
     </div>
@@ -400,7 +399,7 @@
         // Utilisation d'IndexedDB pour le stockage illimité
         let db;
         const dbName = "filesDB";
-        const request = indexedDB.open(dbName, 1);
+        const request = indexedDB.open(dbName, 2);
 
         request.onerror = function(event) {
             console.error("Erreur d'ouverture de la base de données");
@@ -409,7 +408,10 @@
         request.onupgradeneeded = function(event) {
             db = event.target.result;
             if (!db.objectStoreNames.contains('files')) {
-                db.createObjectStore('files', { keyPath: 'name' });
+                const store = db.createObjectStore('files', { keyPath: 'id', autoIncrement: true });
+                store.createIndex('name', 'name', { unique: false });
+                store.createIndex('section', 'section', { unique: false });
+                store.createIndex('category', 'category', { unique: false });
             }
         };
 
@@ -418,21 +420,36 @@
             loadExistingFiles();
         };
 
+        function getCurrentCategory() {
+            const pathParts = window.location.pathname.split('/');
+            return pathParts[pathParts.length - 2] || 'colles'; // Retourne la catégorie (dossier parent) ou 'colles' par défaut
+        }
+
+        function getCurrentSection() {
+            const fileName = window.location.pathname.split('/').pop();
+            return fileName.replace('.html', '');
+        }
+
         function handleFileUpload() {
             const fileInput = document.getElementById('fileInput');
+            const sectionSelect = document.getElementById('fileSection');
             const file = fileInput.files[0];
+            const section = sectionSelect.value;
+            const category = getCurrentCategory();
             
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const fileData = {
                         name: file.name,
-                        data: e.target.result
+                        data: e.target.result,
+                        section: section,
+                        category: category
                     };
 
                     const transaction = db.transaction(['files'], 'readwrite');
                     const store = transaction.objectStore('files');
-                    store.put(fileData);
+                    store.add(fileData);
 
                     transaction.oncomplete = function() {
                         createFileButton(fileData);
@@ -444,73 +461,73 @@
         }
 
         function createFileButton(fileData) {
-            const container = document.createElement('div');
-            container.className = 'dynamic-button-container';
+            const currentCategory = getCurrentCategory();
+            const currentSection = getCurrentSection();
             
-            const button = document.createElement('a');
-            button.className = 'content-button';
-            button.textContent = fileData.name;
-            
-            const actionButtons = document.createElement('div');
-            actionButtons.className = 'button-actions';
-            
-            const openButton = document.createElement('button');
-            openButton.className = 'open-button';
-            openButton.textContent = 'Ouvrir';
-            openButton.onclick = () => {
-                const newWindow = window.open();
-                newWindow.document.write('<iframe width="100%" height="100%" src="' + fileData.data + '"></iframe>');
-            };
+            // Vérifier si le fichier appartient à la catégorie et section courantes
+            if ((currentCategory === fileData.category) && 
+                (currentSection === 'colles' || currentSection === fileData.section)) {
+                const container = document.createElement('div');
+                container.className = 'dynamic-button-container';
+                
+                const button = document.createElement('a');
+                button.className = 'content-button';
+                button.textContent = fileData.name;
+                
+                const actionButtons = document.createElement('div');
+                actionButtons.className = 'button-actions';
+                
+                const openButton = document.createElement('button');
+                openButton.className = 'open-button';
+                openButton.textContent = 'Ouvrir';
+                openButton.onclick = () => {
+                    const newWindow = window.open();
+                    newWindow.document.write('<iframe width="100%" height="100%" src="' + fileData.data + '"></iframe>');
+                };
 
-            const downloadButton = document.createElement('button');
-            downloadButton.className = 'download-button';
-            downloadButton.textContent = 'Télécharger';
-            downloadButton.onclick = () => {
-                const downloadLink = document.createElement('a');
-                downloadLink.href = fileData.data;
-                downloadLink.download = fileData.name;
-                downloadLink.click();
-            };
-            
-            const renameButton = document.createElement('button');
-            renameButton.className = 'rename-button';
-            renameButton.textContent = 'Renommer';
-            renameButton.onclick = () => {
-                const oldName = fileData.name;
-                const newName = prompt('Nouveau nom :', oldName);
-                if (newName && newName !== oldName) {
+                const downloadButton = document.createElement('button');
+                downloadButton.className = 'download-button';
+                downloadButton.textContent = 'Télécharger';
+                downloadButton.onclick = () => {
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = fileData.data;
+                    downloadLink.download = fileData.name;
+                    downloadLink.click();
+                };
+                
+                const renameButton = document.createElement('button');
+                renameButton.className = 'rename-button';
+                renameButton.textContent = 'Renommer';
+                renameButton.onclick = () => {
+                    const newName = prompt('Nouveau nom :', fileData.name);
+                    if (newName && newName !== fileData.name) {
+                        const transaction = db.transaction(['files'], 'readwrite');
+                        const store = transaction.objectStore('files');
+                        fileData.name = newName;
+                        store.put(fileData);
+                        button.textContent = newName;
+                    }
+                };
+                
+                const deleteButton = document.createElement('button');
+                deleteButton.className = 'delete-button';
+                deleteButton.textContent = 'Supprimer';
+                deleteButton.onclick = () => {
                     const transaction = db.transaction(['files'], 'readwrite');
                     const store = transaction.objectStore('files');
-                    
-                    store.get(oldName).onsuccess = function(event) {
-                        const file = event.target.result;
-                        file.name = newName;
-                        store.delete(oldName);
-                        store.put(file);
-                        button.textContent = newName;
-                        fileData.name = newName;
-                    };
-                }
-            };
-            
-            const deleteButton = document.createElement('button');
-            deleteButton.className = 'delete-button';
-            deleteButton.textContent = 'Supprimer';
-            deleteButton.onclick = () => {
-                const transaction = db.transaction(['files'], 'readwrite');
-                const store = transaction.objectStore('files');
-                store.delete(fileData.name);
-                container.remove();
-            };
-            
-            actionButtons.appendChild(openButton);
-            actionButtons.appendChild(downloadButton);
-            actionButtons.appendChild(renameButton);
-            actionButtons.appendChild(deleteButton);
-            container.appendChild(button);
-            container.appendChild(actionButtons);
-            
-            document.getElementById('dynamicButtons').appendChild(container);
+                    store.delete(fileData.id);
+                    container.remove();
+                };
+                
+                actionButtons.appendChild(openButton);
+                actionButtons.appendChild(downloadButton);
+                actionButtons.appendChild(renameButton);
+                actionButtons.appendChild(deleteButton);
+                container.appendChild(button);
+                container.appendChild(actionButtons);
+                
+                document.getElementById('dynamicButtons').appendChild(container);
+            }
         }
 
         function searchFiles() {
@@ -531,6 +548,9 @@
         }
 
         function loadExistingFiles() {
+            const currentCategory = getCurrentCategory();
+            const currentSection = getCurrentSection();
+            
             const transaction = db.transaction(['files'], 'readonly');
             const store = transaction.objectStore('files');
             const request = store.openCursor();
@@ -538,7 +558,10 @@
             request.onsuccess = function(event) {
                 const cursor = event.target.result;
                 if (cursor) {
-                    createFileButton(cursor.value);
+                    if ((currentCategory === cursor.value.category) && 
+                        (currentSection === 'colles' || currentSection === cursor.value.section)) {
+                        createFileButton(cursor.value);
+                    }
                     cursor.continue();
                 }
             };
