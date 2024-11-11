@@ -431,44 +431,11 @@
         <h1>Accueil</h1>
     </div>
 
-    <div class="content-buttons">
-        <a href="cours.html" class="content-button">Cours</a>
-        <a href="td.html" class="content-button">Travaux Dirigés</a>
-        <a href="devoirs.html" class="content-button">Devoirs</a>
-        <a href="snt.html" class="content-button">SNT</a>
-    </div>
-
     <div class="login-form" id="loginForm">
         <input type="text" id="username" placeholder="Nom d'utilisateur">
         <input type="password" id="password" placeholder="Mot de passe">
         <button onclick="login()">Se connecter</button>
     </div>
-
-    <div class="file-upload" id="fileUploadSection">
-        <select id="fileSection">
-            <option value="cours">Cours</option>
-            <option value="td">Travaux Dirigés</option>
-            <option value="devoirs">Devoirs</option>
-            <option value="snt">SNT</option>
-        </select>
-        <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.tex">
-        <button onclick="handleFileUpload()">Ajouter le fichier</button>
-    </div>
-
-    <div class="search-container">
-        <input type="text" id="searchInput" placeholder="Rechercher un fichier..." onkeyup="searchFiles()">
-    </div>
-
-    <div id="dynamicButtons" class="content-buttons">
-        <!-- Les boutons dynamiques seront ajoutés ici -->
-    </div>
-
-    <div id="renameModal" class="modal">
-        <input type="text" id="newFileName" placeholder="Nouveau nom de fichier">
-        <button onclick="confirmRename()">Confirmer</button>
-        <button onclick="closeRenameModal()">Annuler</button>
-    </div>
-    <div id="modalOverlay" class="modal-overlay"></div>
 
     <footer>
         <p>&copy; 2024 Fabdelkarim - Tous droits réservés</p>
