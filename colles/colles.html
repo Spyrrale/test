@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Colles - Accueil - Fabdelkarim</title>
     <style>
-        /* Styles CSS inchangés */
         body {
             margin: 0;
             padding: 0;
@@ -194,6 +193,7 @@
             background-color: rgba(30, 30, 30, 0.95);
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(111, 15, 19, 0.3);
+            display: none; /* Caché par défaut */
         }
 
         .file-upload input[type="file"] {
@@ -229,7 +229,7 @@
             gap: 0.5rem;
         }
 
-        .rename-button, .delete-button, .open-button, .download-button {
+        .delete-button, .open-button, .rename-button, .download-button {
             padding: 0.3rem 0.8rem;
             background-color: #6f0f13;
             color: #fff;
@@ -239,8 +239,41 @@
             transition: all 0.3s ease;
         }
 
-        .rename-button:hover, .delete-button:hover, .open-button:hover, .download-button:hover {
+        .delete-button:hover, .open-button:hover, .rename-button:hover, .download-button:hover {
             background-color: #8f1419;
+        }
+
+        .admin-only {
+            display: none; /* Caché par défaut */
+        }
+
+        .login-form {
+            margin: 2rem auto;
+            max-width: 400px;
+            padding: 2rem;
+            background-color: rgba(30, 30, 30, 0.95);
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(111, 15, 19, 0.3);
+        }
+
+        .login-form input {
+            width: 100%;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            border: none;
+            border-radius: 4px;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .login-form button {
+            width: 100%;
+            padding: 0.5rem;
+            background-color: #6f0f13;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
         }
 
         .search-container {
@@ -274,6 +307,35 @@
             gap: 1rem;
             padding: 2rem;
         }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(30, 30, 30, 0.95);
+            padding: 20px;
+            border-radius: 8px;
+            z-index: 1000;
+        }
+
+        .modal input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
     </style>
 </head>
 <body>
@@ -281,7 +343,6 @@
         <div class="nav-container">
             <a href="../index.html" class="logo">Fabdelkarim</a>
             <nav class="nav-links">
-
                 <!-- Seconde -->
                 <div class="dropdown">
                     <a href="../seconde/seconde.html">Seconde</a>
@@ -362,14 +423,12 @@
                         <a href="../enscientifique/devoirs.html">Devoirs</a>
                     </div>
                 </div>
-
-                
             </nav>
         </div>
     </header>
 
     <div class="banner">
-        <h1>Colles- Accueil</h1>
+        <h1>Colles - Accueil</h1>
     </div>
 
     <div class="content-buttons">
@@ -378,7 +437,18 @@
         <a href="devoirs.html" class="content-button">Devoirs</a>
     </div>
 
-    <div class="file-upload">
+    <div class="login-form" id="loginForm">
+        <input type="text" id="username" placeholder="Nom d'utilisateur">
+        <input type="password" id="password" placeholder="Mot de passe">
+        <button onclick="login()">Se connecter</button>
+    </div>
+
+    <div class="file-upload" id="fileUploadSection">
+        <select id="fileSection">
+            <option value="cours">Cours</option>
+            <option value="td">Travaux Dirigés</option>
+            <option value="devoirs">Devoirs</option>
+        </select>
         <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.tex">
         <button onclick="handleFileUpload()">Ajouter le fichier</button>
     </div>
@@ -391,52 +461,82 @@
         <!-- Les boutons dynamiques seront ajoutés ici -->
     </div>
 
+    <div id="renameModal" class="modal">
+        <input type="text" id="newFileName" placeholder="Nouveau nom de fichier">
+        <button onclick="confirmRename()">Confirmer</button>
+        <button onclick="closeRenameModal()">Annuler</button>
+    </div>
+    <div id="modalOverlay" class="modal-overlay"></div>
+
     <footer>
         <p>&copy; 2024 Fabdelkarim - Tous droits réservés</p>
     </footer>
 
     <script>
-        // Utilisation d'IndexedDB pour le stockage illimité
-        let db;
-        const dbName = "filesDB";
-        const request = indexedDB.open(dbName, 1);
+        let files = JSON.parse(localStorage.getItem('files')) || [];
+        let currentFileToRename = null;
+        let isAdmin = sessionStorage.getItem('isAdmin') === 'true'; // Utilise sessionStorage au lieu de localStorage
 
-        request.onerror = function(event) {
-            console.error("Erreur d'ouverture de la base de données");
-        };
+        // Identifiants admin (à stocker de manière plus sécurisée en production)
+        const ADMIN_USERNAME = "admin";
+        const ADMIN_PASSWORD = "admin123";
 
-        request.onupgradeneeded = function(event) {
-            db = event.target.result;
-            if (!db.objectStoreNames.contains('files')) {
-                db.createObjectStore('files', { keyPath: 'name' });
+        // Vérifier le statut admin au chargement
+        window.onload = function() {
+            if (isAdmin) {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('fileUploadSection').style.display = 'block';
+                // Afficher les boutons admin
+                document.querySelectorAll('.admin-only').forEach(el => {
+                    el.style.display = 'block';
+                });
             }
-        };
+            files.forEach(createFileButton);
+        }
 
-        request.onsuccess = function(event) {
-            db = event.target.result;
-            loadExistingFiles();
-        };
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+                isAdmin = true;
+                sessionStorage.setItem('isAdmin', 'true'); // Utilise sessionStorage
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('fileUploadSection').style.display = 'block';
+                // Afficher les boutons admin après connexion
+                document.querySelectorAll('.admin-only').forEach(el => {
+                    el.style.display = 'block';
+                });
+                refreshFileButtons();
+            } else {
+                alert('Identifiants incorrects');
+            }
+        }
 
         function handleFileUpload() {
+            if (!isAdmin) {
+                alert('Vous devez être connecté en tant qu\'administrateur');
+                return;
+            }
+
             const fileInput = document.getElementById('fileInput');
+            const sectionSelect = document.getElementById('fileSection');
             const file = fileInput.files[0];
             
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const fileData = {
+                        id: Date.now(),
                         name: file.name,
-                        data: e.target.result
+                        section: sectionSelect.value,
+                        content: e.target.result
                     };
-
-                    const transaction = db.transaction(['files'], 'readwrite');
-                    const store = transaction.objectStore('files');
-                    store.put(fileData);
-
-                    transaction.oncomplete = function() {
-                        createFileButton(fileData);
-                        fileInput.value = '';
-                    };
+                    
+                    files.push(fileData);
+                    localStorage.setItem('files', JSON.stringify(files));
+                    createFileButton(fileData);
+                    fileInput.value = '';
                 };
                 reader.readAsDataURL(file);
             }
@@ -450,66 +550,105 @@
             button.className = 'content-button';
             button.textContent = fileData.name;
             
-            const actionButtons = document.createElement('div');
-            actionButtons.className = 'button-actions';
-            
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'button-actions';
+
+            // Bouton Ouvrir
             const openButton = document.createElement('button');
             openButton.className = 'open-button';
             openButton.textContent = 'Ouvrir';
-            openButton.onclick = () => {
-                const newWindow = window.open();
-                newWindow.document.write('<iframe width="100%" height="100%" src="' + fileData.data + '"></iframe>');
-            };
+            openButton.onclick = () => openFile(fileData);
 
+            // Bouton Télécharger
             const downloadButton = document.createElement('button');
             downloadButton.className = 'download-button';
             downloadButton.textContent = 'Télécharger';
-            downloadButton.onclick = () => {
-                const downloadLink = document.createElement('a');
-                downloadLink.href = fileData.data;
-                downloadLink.download = fileData.name;
-                downloadLink.click();
-            };
-            
+            downloadButton.onclick = () => downloadFile(fileData);
+
+            actionsDiv.appendChild(openButton);
+            actionsDiv.appendChild(downloadButton);
+
+            // Boutons admin
             const renameButton = document.createElement('button');
-            renameButton.className = 'rename-button';
+            renameButton.className = 'rename-button admin-only';
             renameButton.textContent = 'Renommer';
-            renameButton.onclick = () => {
-                const oldName = fileData.name;
-                const newName = prompt('Nouveau nom :', oldName);
-                if (newName && newName !== oldName) {
-                    const transaction = db.transaction(['files'], 'readwrite');
-                    const store = transaction.objectStore('files');
-                    
-                    store.get(oldName).onsuccess = function(event) {
-                        const file = event.target.result;
-                        file.name = newName;
-                        store.delete(oldName);
-                        store.put(file);
-                        button.textContent = newName;
-                        fileData.name = newName;
-                    };
+            renameButton.style.display = isAdmin ? 'block' : 'none';
+            renameButton.onclick = () => showRenameModal(fileData);
+            actionsDiv.appendChild(renameButton);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-button admin-only';
+            deleteButton.textContent = 'Supprimer';
+            deleteButton.style.display = isAdmin ? 'block' : 'none';
+            deleteButton.onclick = () => {
+                if (confirm('Êtes-vous sûr de vouloir supprimer ce fichier ?')) {
+                    files = files.filter(f => f.id !== fileData.id);
+                    localStorage.setItem('files', JSON.stringify(files));
+                    container.remove();
                 }
             };
+            actionsDiv.appendChild(deleteButton);
             
-            const deleteButton = document.createElement('button');
-            deleteButton.className = 'delete-button';
-            deleteButton.textContent = 'Supprimer';
-            deleteButton.onclick = () => {
-                const transaction = db.transaction(['files'], 'readwrite');
-                const store = transaction.objectStore('files');
-                store.delete(fileData.name);
-                container.remove();
-            };
-            
-            actionButtons.appendChild(openButton);
-            actionButtons.appendChild(downloadButton);
-            actionButtons.appendChild(renameButton);
-            actionButtons.appendChild(deleteButton);
             container.appendChild(button);
-            container.appendChild(actionButtons);
+            container.appendChild(actionsDiv);
             
             document.getElementById('dynamicButtons').appendChild(container);
+        }
+
+        function refreshFileButtons() {
+            const dynamicButtons = document.getElementById('dynamicButtons');
+            dynamicButtons.innerHTML = '';
+            files.forEach(createFileButton);
+        }
+
+        function openFile(fileData) {
+            const newWindow = window.open();
+            newWindow.document.write(`
+                <iframe src="${fileData.content}" width="100%" height="100%" style="border: none;"></iframe>
+            `);
+        }
+
+        function showRenameModal(fileData) {
+            if (!isAdmin) {
+                alert('Vous devez être connecté en tant qu\'administrateur');
+                return;
+            }
+            currentFileToRename = fileData;
+            document.getElementById('newFileName').value = fileData.name;
+            document.getElementById('renameModal').style.display = 'block';
+            document.getElementById('modalOverlay').style.display = 'block';
+        }
+
+        function closeRenameModal() {
+            document.getElementById('renameModal').style.display = 'none';
+            document.getElementById('modalOverlay').style.display = 'none';
+            currentFileToRename = null;
+        }
+
+        function confirmRename() {
+            if (!isAdmin) {
+                alert('Vous devez être connecté en tant qu\'administrateur');
+                return;
+            }
+            const newName = document.getElementById('newFileName').value;
+            if (newName && currentFileToRename) {
+                const fileIndex = files.findIndex(f => f.id === currentFileToRename.id);
+                if (fileIndex !== -1) {
+                    files[fileIndex].name = newName;
+                    localStorage.setItem('files', JSON.stringify(files));
+                    refreshFileButtons();
+                }
+            }
+            closeRenameModal();
+        }
+
+        function downloadFile(fileData) {
+            const link = document.createElement('a');
+            link.href = fileData.content;
+            link.download = fileData.name;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         function searchFiles() {
@@ -521,26 +660,8 @@
                 const button = container.querySelector('.content-button');
                 const fileName = button.textContent.toLowerCase();
                 
-                if (fileName.includes(searchTerm)) {
-                    container.style.display = 'flex';
-                } else {
-                    container.style.display = 'none';
-                }
+                container.style.display = fileName.includes(searchTerm) ? 'flex' : 'none';
             });
-        }
-
-        function loadExistingFiles() {
-            const transaction = db.transaction(['files'], 'readonly');
-            const store = transaction.objectStore('files');
-            const request = store.openCursor();
-
-            request.onsuccess = function(event) {
-                const cursor = event.target.result;
-                if (cursor) {
-                    createFileButton(cursor.value);
-                    cursor.continue();
-                }
-            };
         }
     </script>
 </body>
