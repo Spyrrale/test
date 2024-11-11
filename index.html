@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Accueil - Fabdelkarim</title>
+    <title>Seconde - Cours - Fabdelkarim</title>
     <style>
         body {
             margin: 0;
@@ -193,7 +193,7 @@
             background-color: rgba(30, 30, 30, 0.95);
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(111, 15, 19, 0.3);
-            display: none;
+            display: none; /* Caché par défaut */
         }
 
         .file-upload input[type="file"] {
@@ -244,7 +244,7 @@
         }
 
         .admin-only {
-            display: none;
+            display: none; /* Caché par défaut */
         }
 
         .login-form {
@@ -428,7 +428,14 @@
     </header>
 
     <div class="banner">
-        <h1>Accueil</h1>
+        <h1>Seconde - Cours</h1>
+    </div>
+
+    <div class="content-buttons">
+        <a href="cours.html" class="content-button">Cours</a>
+        <a href="td.html" class="content-button">Travaux Dirigés</a>
+        <a href="devoirs.html" class="content-button">Devoirs</a>
+        <a href="snt.html" class="content-button">SNT</a>
     </div>
 
     <div class="login-form" id="loginForm">
@@ -470,94 +477,46 @@
     <script>
         let files = JSON.parse(localStorage.getItem('files')) || [];
         let currentFileToRename = null;
-        let isAdmin = false;
-        let loginAttempts = 0;
-        let lastLoginAttempt = 0;
+        let isAdmin = sessionStorage.getItem('isAdmin') === 'true'; // Utilise sessionStorage au lieu de localStorage
 
-        // Utilisation de SHA-256 pour le hachage des mots de passe
-        async function sha256(message) {
-            const msgBuffer = new TextEncoder().encode(message);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            return hashHex;
-        }
-
-        // Identifiants admin sécurisés (à stocker côté serveur en production)
+        // Identifiants admin (à stocker de manière plus sécurisée en production)
         const ADMIN_USERNAME = "admin";
-        const ADMIN_PASSWORD_HASH = "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9"; // Hash de "admin123"
+        const ADMIN_PASSWORD = "admin123";
 
+        // Vérifier le statut admin au chargement
         window.onload = function() {
-            checkAdminStatus();
+            if (isAdmin) {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('fileUploadSection').style.display = 'block';
+                // Afficher les boutons admin
+                document.querySelectorAll('.admin-only').forEach(el => {
+                    el.style.display = 'block';
+                });
+            }
             files.forEach(createFileButton);
         }
 
-        async function login() {
-            const currentTime = Date.now();
-            
-            // Vérification du délai entre les tentatives (30 secondes)
-            if (loginAttempts >= 3 && (currentTime - lastLoginAttempt) < 30000) {
-                const remainingTime = Math.ceil((30000 - (currentTime - lastLoginAttempt)) / 1000);
-                alert(`Trop de tentatives. Veuillez attendre ${remainingTime} secondes.`);
-                return;
-            }
-
-            // Réinitialisation des tentatives après 30 secondes
-            if ((currentTime - lastLoginAttempt) >= 30000) {
-                loginAttempts = 0;
-            }
-
+        function login() {
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-            const hashedPassword = await sha256(password);
 
-            if (username === ADMIN_USERNAME && hashedPassword === ADMIN_PASSWORD_HASH) {
+            if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
                 isAdmin = true;
-                const token = generateSecureToken();
-                sessionStorage.setItem('adminToken', token);
-                sessionStorage.setItem('tokenExpiry', Date.now() + 3600000); // Expire après 1 heure
-                
+                sessionStorage.setItem('isAdmin', 'true'); // Utilise sessionStorage
                 document.getElementById('loginForm').style.display = 'none';
                 document.getElementById('fileUploadSection').style.display = 'block';
+                // Afficher les boutons admin après connexion
                 document.querySelectorAll('.admin-only').forEach(el => {
                     el.style.display = 'block';
                 });
                 refreshFileButtons();
-                loginAttempts = 0;
             } else {
-                loginAttempts++;
-                lastLoginAttempt = currentTime;
                 alert('Identifiants incorrects');
             }
         }
 
-        function generateSecureToken() {
-            const array = new Uint8Array(32);
-            crypto.getRandomValues(array);
-            return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-        }
-
-        function checkAdminStatus() {
-            const token = sessionStorage.getItem('adminToken');
-            const expiry = sessionStorage.getItem('tokenExpiry');
-            
-            if (token && expiry && Date.now() < parseInt(expiry)) {
-                isAdmin = true;
-                document.getElementById('loginForm').style.display = 'none';
-                document.getElementById('fileUploadSection').style.display = 'block';
-                document.querySelectorAll('.admin-only').forEach(el => {
-                    el.style.display = 'block';
-                });
-            } else {
-                // Session expirée ou invalide
-                sessionStorage.removeItem('adminToken');
-                sessionStorage.removeItem('tokenExpiry');
-                isAdmin = false;
-            }
-        }
-
         function handleFileUpload() {
-            if (!isAdmin || !checkAdminStatus()) {
+            if (!isAdmin) {
                 alert('Vous devez être connecté en tant qu\'administrateur');
                 return;
             }
@@ -596,11 +555,13 @@
             const actionsDiv = document.createElement('div');
             actionsDiv.className = 'button-actions';
 
+            // Bouton Ouvrir
             const openButton = document.createElement('button');
             openButton.className = 'open-button';
             openButton.textContent = 'Ouvrir';
             openButton.onclick = () => openFile(fileData);
 
+            // Bouton Télécharger
             const downloadButton = document.createElement('button');
             downloadButton.className = 'download-button';
             downloadButton.textContent = 'Télécharger';
@@ -609,27 +570,26 @@
             actionsDiv.appendChild(openButton);
             actionsDiv.appendChild(downloadButton);
 
-            if (isAdmin) {
-                const renameButton = document.createElement('button');
-                renameButton.className = 'rename-button admin-only';
-                renameButton.textContent = 'Renommer';
-                renameButton.style.display = 'block';
-                renameButton.onclick = () => showRenameModal(fileData);
-                actionsDiv.appendChild(renameButton);
+            // Boutons admin
+            const renameButton = document.createElement('button');
+            renameButton.className = 'rename-button admin-only';
+            renameButton.textContent = 'Renommer';
+            renameButton.style.display = isAdmin ? 'block' : 'none';
+            renameButton.onclick = () => showRenameModal(fileData);
+            actionsDiv.appendChild(renameButton);
 
-                const deleteButton = document.createElement('button');
-                deleteButton.className = 'delete-button admin-only';
-                deleteButton.textContent = 'Supprimer';
-                deleteButton.style.display = 'block';
-                deleteButton.onclick = () => {
-                    if (confirm('Êtes-vous sûr de vouloir supprimer ce fichier ?')) {
-                        files = files.filter(f => f.id !== fileData.id);
-                        localStorage.setItem('files', JSON.stringify(files));
-                        container.remove();
-                    }
-                };
-                actionsDiv.appendChild(deleteButton);
-            }
+            const deleteButton = document.createElement('button');
+            deleteButton.className = 'delete-button admin-only';
+            deleteButton.textContent = 'Supprimer';
+            deleteButton.style.display = isAdmin ? 'block' : 'none';
+            deleteButton.onclick = () => {
+                if (confirm('Êtes-vous sûr de vouloir supprimer ce fichier ?')) {
+                    files = files.filter(f => f.id !== fileData.id);
+                    localStorage.setItem('files', JSON.stringify(files));
+                    container.remove();
+                }
+            };
+            actionsDiv.appendChild(deleteButton);
             
             container.appendChild(button);
             container.appendChild(actionsDiv);
@@ -651,7 +611,7 @@
         }
 
         function showRenameModal(fileData) {
-            if (!isAdmin || !checkAdminStatus()) {
+            if (!isAdmin) {
                 alert('Vous devez être connecté en tant qu\'administrateur');
                 return;
             }
@@ -668,7 +628,7 @@
         }
 
         function confirmRename() {
-            if (!isAdmin || !checkAdminStatus()) {
+            if (!isAdmin) {
                 alert('Vous devez être connecté en tant qu\'administrateur');
                 return;
             }
